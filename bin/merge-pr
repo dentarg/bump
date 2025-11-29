@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+set -u
+
+REPO=dentarg/bump
+PR=$1
+
+gh pr --repo $REPO ready $PR
+gh pr --repo $REPO review --approve $PR
+gh pr --repo $REPO merge --squash $PR
