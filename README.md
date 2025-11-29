@@ -42,15 +42,14 @@ See [`action.yml`](blob/main/action.yml).
 
 ## Development
 
-How to test the action:
-
 ```shell
+# test main
 bin/test
 
-# test changes
+# test pull-request
 bin/test <pull-request number>
 
-# cleanup
+# cleanup pull-request created from testing
 bin/del <pull-request number>
 
 # squash merge pull-request
