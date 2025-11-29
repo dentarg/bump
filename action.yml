@@ -39,6 +39,15 @@ runs:
         ruby-version: ruby
         bundler-cache: true
 
+    - name: Ensure jq is installed
+      shell: bash
+      run: |
+        if ! command -v jq &> /dev/null; then
+          echo "jq not found, installing..."
+          sudo apt-get update
+          sudo apt-get install -y jq
+        fi
+
     - name: Get old version
       id: old_version
       shell: bash
@@ -85,17 +94,9 @@ runs:
           exit 0
         }
 
-        # Check if jq is available
-        if command -v jq &> /dev/null; then
-          CHANGELOG_URL=$(echo "$RESPONSE" | jq -r '.changelog_uri // empty')
-          SOURCE_CODE_URI=$(echo "$RESPONSE" | jq -r '.source_code_uri // empty')
-          HOMEPAGE_URI=$(echo "$RESPONSE" | jq -r '.homepage_uri // empty')
-        else
-          # Fallback: extract using grep/sed if jq is not available
-          CHANGELOG_URL=$(echo "$RESPONSE" | grep -o '"changelog_uri":"[^"]*"' | sed 's/"changelog_uri":"\(.*\)"/\1/' | head -1)
-          SOURCE_CODE_URI=$(echo "$RESPONSE" | grep -o '"source_code_uri":"[^"]*"' | sed 's/"source_code_uri":"\(.*\)"/\1/' | head -1)
-          HOMEPAGE_URI=$(echo "$RESPONSE" | grep -o '"homepage_uri":"[^"]*"' | sed 's/"homepage_uri":"\(.*\)"/\1/' | head -1)
-        fi
+        CHANGELOG_URL=$(echo "$RESPONSE" | jq -r '.changelog_uri // empty')
+        SOURCE_CODE_URI=$(echo "$RESPONSE" | jq -r '.source_code_uri // empty')
+        HOMEPAGE_URI=$(echo "$RESPONSE" | jq -r '.homepage_uri // empty')
 
         if [ -n "$CHANGELOG_URL" ]; then
           echo "url=$CHANGELOG_URL" >> $GITHUB_OUTPUT
@@ -166,42 +167,37 @@ runs:
         }
 
         # Parse releases and filter those between old and new version
-        if command -v jq &> /dev/null; then
-          RELEASE_LINKS=""
-          while IFS= read -r line; do
-            TAG=$(echo "$line" | cut -d'|' -f1)
-            URL=$(echo "$line" | cut -d'|' -f2)
+        RELEASE_LINKS=""
+        while IFS= read -r line; do
+          TAG=$(echo "$line" | cut -d'|' -f1)
+          URL=$(echo "$line" | cut -d'|' -f2)
 
-            # Extract version from tag (strip leading 'v' for comparison)
-            TAG_VERSION=$(echo "$TAG" | sed 's/^v//')
-            OLD_V=$(echo "$OLD_VERSION" | sed 's/^v//')
-            NEW_V=$(echo "$NEW_VERSION" | sed 's/^v//')
+          # Extract version from tag (strip leading 'v' for comparison)
+          TAG_VERSION=$(echo "$TAG" | sed 's/^v//')
+          OLD_V=$(echo "$OLD_VERSION" | sed 's/^v//')
+          NEW_V=$(echo "$NEW_VERSION" | sed 's/^v//')
 
-            # Check if version is > old and <= new
-            if [ "$(printf '%s\n%s' "$OLD_V" "$TAG_VERSION" | sort -V | head -n1)" = "$OLD_V" ] && \
-               [ "$OLD_V" != "$TAG_VERSION" ] && \
-               [ "$(printf '%s\n%s' "$TAG_VERSION" "$NEW_V" | sort -V | head -n1)" = "$TAG_VERSION" ]; then
-              if [ -n "$RELEASE_LINKS" ]; then
-                RELEASE_LINKS="${RELEASE_LINKS}
+          # Check if version is > old and <= new
+          if [ "$(printf '%s\n%s' "$OLD_V" "$TAG_VERSION" | sort -V | head -n1)" = "$OLD_V" ] && \
+             [ "$OLD_V" != "$TAG_VERSION" ] && \
+             [ "$(printf '%s\n%s' "$TAG_VERSION" "$NEW_V" | sort -V | head -n1)" = "$TAG_VERSION" ]; then
+            if [ -n "$RELEASE_LINKS" ]; then
+              RELEASE_LINKS="${RELEASE_LINKS}
         - [$TAG]($URL)"
-              else
-                RELEASE_LINKS="- [$TAG]($URL)"
-              fi
+            else
+              RELEASE_LINKS="- [$TAG]($URL)"
             fi
-          done < <(echo "$RELEASES_JSON" | jq -r '.[] | "\(.tag_name)|\(.html_url)"')
-
-          if [ -n "$RELEASE_LINKS" ]; then
-            echo "releases<<EOF" >> $GITHUB_OUTPUT
-            echo "$RELEASE_LINKS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "Found releases:"
-            echo "$RELEASE_LINKS"
-          else
-            echo "No matching releases found"
-            echo "releases=" >> $GITHUB_OUTPUT
           fi
+        done < <(echo "$RELEASES_JSON" | jq -r '.[] | "\(.tag_name)|\(.html_url)"')
+
+        if [ -n "$RELEASE_LINKS" ]; then
+          echo "releases<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_LINKS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Found releases:"
+          echo "$RELEASE_LINKS"
         else
-          echo "jq not available, skipping release links"
+          echo "No matching releases found"
           echo "releases=" >> $GITHUB_OUTPUT
         fi
 
