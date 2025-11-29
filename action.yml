@@ -89,10 +89,12 @@ runs:
         if command -v jq &> /dev/null; then
           CHANGELOG_URL=$(echo "$RESPONSE" | jq -r '.changelog_uri // empty')
           SOURCE_CODE_URI=$(echo "$RESPONSE" | jq -r '.source_code_uri // empty')
+          HOMEPAGE_URI=$(echo "$RESPONSE" | jq -r '.homepage_uri // empty')
         else
           # Fallback: extract using grep/sed if jq is not available
           CHANGELOG_URL=$(echo "$RESPONSE" | grep -o '"changelog_uri":"[^"]*"' | sed 's/"changelog_uri":"\(.*\)"/\1/' | head -1)
           SOURCE_CODE_URI=$(echo "$RESPONSE" | grep -o '"source_code_uri":"[^"]*"' | sed 's/"source_code_uri":"\(.*\)"/\1/' | head -1)
+          HOMEPAGE_URI=$(echo "$RESPONSE" | grep -o '"homepage_uri":"[^"]*"' | sed 's/"homepage_uri":"\(.*\)"/\1/' | head -1)
         fi
 
         if [ -n "$CHANGELOG_URL" ]; then
@@ -103,21 +105,29 @@ runs:
           echo "url=" >> $GITHUB_OUTPUT
         fi
 
-        # Extract GitHub repo if source is hosted on GitHub
+        # Extract GitHub repo - try source_code_uri first, fall back to homepage_uri
+        REPO_URI=""
         if [ -n "$SOURCE_CODE_URI" ]; then
           echo "Found source code URI: $SOURCE_CODE_URI"
+          REPO_URI="$SOURCE_CODE_URI"
+        elif [ -n "$HOMEPAGE_URI" ]; then
+          echo "No source code URI, trying homepage URI: $HOMEPAGE_URI"
+          REPO_URI="$HOMEPAGE_URI"
+        fi
+
+        if [ -n "$REPO_URI" ]; then
           # Check if it's a GitHub URL and extract owner/repo
-          if echo "$SOURCE_CODE_URI" | grep -qE '^https://github\.com/[^/]+/[^/]+'; then
+          if echo "$REPO_URI" | grep -qE '^https://github\.com/[^/]+/[^/]+'; then
             # Extract the base GitHub repo URL (remove any trailing paths like /tree/main)
-            GITHUB_REPO_URL=$(echo "$SOURCE_CODE_URI" | sed -E 's#^(https://github\.com/[^/]+/[^/]+).*#\1#')
+            GITHUB_REPO_URL=$(echo "$REPO_URI" | sed -E 's#^(https://github\.com/[^/]+/[^/]+).*#\1#')
             echo "github_repo=$GITHUB_REPO_URL" >> $GITHUB_OUTPUT
             echo "Found GitHub repo: $GITHUB_REPO_URL"
           else
-            echo "Source is not hosted on GitHub"
+            echo "URI is not hosted on GitHub: $REPO_URI"
             echo "github_repo=" >> $GITHUB_OUTPUT
           fi
         else
-          echo "No source code URI found"
+          echo "No source code URI or homepage URI found"
           echo "github_repo=" >> $GITHUB_OUTPUT
         fi
 
