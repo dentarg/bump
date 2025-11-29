@@ -37,7 +37,9 @@ runs:
 
     - name: Update gem with bundler
       shell: bash
-      run: bundle update --conservative ${{ inputs.gem_name }}
+      run: |
+        bundle config set frozen false
+        bundle update --conservative ${{ inputs.gem_name }}
 
     - name: Get changelog URL
       id: changelog
