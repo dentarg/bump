@@ -33,16 +33,63 @@ runs:
       shell: bash
       run: bundle update --conservative ${{ inputs.gem_name }}
 
+    - name: Get changelog URL
+      id: changelog
+      shell: bash
+      run: |
+        # Extract the new version from Gemfile.lock (handles various indentation)
+        VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | head -1 | sed 's/.*(\(.*\))/\1/')
+        if [ -z "$VERSION" ]; then
+          echo "Could not find version for ${{ inputs.gem_name }}"
+          echo "url=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        echo "Found version: $VERSION"
+
+        # Fetch gem info from RubyGems API
+        API_URL="https://rubygems.org/api/v2/rubygems/${{ inputs.gem_name }}/versions/${VERSION}.json"
+        RESPONSE=$(curl -sf "$API_URL" 2>/dev/null) || {
+          echo "Failed to fetch gem info from RubyGems API"
+          echo "url=" >> $GITHUB_OUTPUT
+          exit 0
+        }
+
+        # Check if jq is available
+        if command -v jq &> /dev/null; then
+          CHANGELOG_URL=$(echo "$RESPONSE" | jq -r '.changelog_uri // empty')
+        else
+          # Fallback: extract changelog_uri using grep/sed if jq is not available
+          CHANGELOG_URL=$(echo "$RESPONSE" | grep -o '"changelog_uri":"[^"]*"' | sed 's/"changelog_uri":"\(.*\)"/\1/' | head -1)
+        fi
+
+        if [ -n "$CHANGELOG_URL" ]; then
+          echo "url=$CHANGELOG_URL" >> $GITHUB_OUTPUT
+          echo "Found changelog: $CHANGELOG_URL"
+        else
+          echo "No changelog URL found"
+          echo "url=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build PR body
+      id: body
+      shell: bash
+      run: |
+        BODY="This PR updates the \`${{ inputs.gem_name }}\` gem using \`bundle update --conservative\`."
+        if [ -n "${{ steps.changelog.outputs.url }}" ]; then
+          BODY="${BODY}
+
+        **Changelog:** ${{ steps.changelog.outputs.url }}"
+        fi
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        echo "$BODY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v7
       with:
         token: ${{ inputs.github_token }}
         commit-message: "Bump ${{ inputs.gem_name }}"
         title: "Bump ${{ inputs.gem_name }}"
-        body: |
-          This PR updates the `${{ inputs.gem_name }}` gem using `bundle update --conservative`.
-
-          ---
-          *Created by [bump](https://github.com/dentarg/bump)*
+        body: ${{ steps.body.outputs.content }}
         branch: ${{ steps.branch.outputs.name }}
         delete-branch: true
