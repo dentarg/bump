@@ -15,6 +15,10 @@ inputs:
     description: 'Name of the branch to create for the PR'
     required: false
     default: ''
+  labels:
+    description: 'Comma-separated list of labels to apply to the pull request'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -136,4 +140,5 @@ runs:
         title: ${{ steps.title.outputs.content }}
         body: ${{ steps.body.outputs.content }}
         branch: ${{ steps.branch.outputs.name }}
+        labels: ${{ inputs.labels }}
         delete-branch: true
