@@ -37,10 +37,10 @@ runs:
 
     - name: Update gem with bundler
       shell: bash
+      env:
+        BUNDLE_FROZEN: false
       run: |
         bundle update --conservative ${{ inputs.gem_name }}
-      env:
-        BUNDLE_FROZEN=false
 
     - name: Get changelog URL
       id: changelog
