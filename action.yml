@@ -92,6 +92,11 @@ runs:
         echo "$BODY" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
+    - name: Exclude irrelevant files from the pull request
+      run: |
+        echo "/.bundle/config" >> .gitignore
+        echo "/vendor/bundle" >> .gitignore
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v7
       with:
