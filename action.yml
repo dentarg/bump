@@ -133,6 +133,7 @@ runs:
         rm -rf vendor/bundle
 
     - name: Create Pull Request
+      id: create-pr
       uses: peter-evans/create-pull-request@v7
       with:
         token: ${{ inputs.github_token }}
@@ -142,3 +143,9 @@ runs:
         branch: ${{ steps.branch.outputs.name }}
         labels: ${{ inputs.labels }}
         delete-branch: true
+
+    - name: Show Pull Request URL
+      if: steps.create-pr.outputs.pull-request-url
+      shell: bash
+      run: |
+        echo "::notice::Pull request created: ${{ steps.create-pr.outputs.pull-request-url }}"
