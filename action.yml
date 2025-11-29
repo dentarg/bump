@@ -35,6 +35,20 @@ runs:
         ruby-version: ruby
         bundler-cache: true
 
+    - name: Get old version
+      id: old_version
+      shell: bash
+      run: |
+        # Extract the old version from Gemfile.lock before updating
+        OLD_VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | head -1 | sed 's/.*(\(.*\))/\1/')
+        if [ -n "$OLD_VERSION" ]; then
+          echo "version=$OLD_VERSION" >> $GITHUB_OUTPUT
+          echo "Found old version: $OLD_VERSION"
+        else
+          echo "Could not find old version for ${{ inputs.gem_name }}"
+          echo "version=" >> $GITHUB_OUTPUT
+        fi
+
     - name: Update gem with bundler
       shell: bash
       env:
@@ -51,17 +65,19 @@ runs:
         if [ -z "$VERSION" ]; then
           echo "Could not find version for ${{ inputs.gem_name }}"
           echo "url=" >> $GITHUB_OUTPUT
-          echo "releases_url=" >> $GITHUB_OUTPUT
+          echo "new_version=" >> $GITHUB_OUTPUT
+          echo "github_repo=" >> $GITHUB_OUTPUT
           exit 0
         fi
         echo "Found version: $VERSION"
+        echo "new_version=$VERSION" >> $GITHUB_OUTPUT
 
         # Fetch gem info from RubyGems API
         API_URL="https://rubygems.org/api/v2/rubygems/${{ inputs.gem_name }}/versions/${VERSION}.json"
         RESPONSE=$(curl -sf "$API_URL" 2>/dev/null) || {
           echo "Failed to fetch gem info from RubyGems API"
           echo "url=" >> $GITHUB_OUTPUT
-          echo "releases_url=" >> $GITHUB_OUTPUT
+          echo "github_repo=" >> $GITHUB_OUTPUT
           exit 0
         }
 
@@ -83,23 +99,96 @@ runs:
           echo "url=" >> $GITHUB_OUTPUT
         fi
 
-        # Build GitHub releases URL if source is hosted on GitHub
+        # Extract GitHub repo if source is hosted on GitHub
         if [ -n "$SOURCE_CODE_URI" ]; then
           echo "Found source code URI: $SOURCE_CODE_URI"
           # Check if it's a GitHub URL and extract owner/repo
           if echo "$SOURCE_CODE_URI" | grep -qE '^https://github\.com/[^/]+/[^/]+'; then
             # Extract the base GitHub repo URL (remove any trailing paths like /tree/main)
             GITHUB_REPO_URL=$(echo "$SOURCE_CODE_URI" | sed -E 's#^(https://github\.com/[^/]+/[^/]+).*#\1#')
-            RELEASES_URL="${GITHUB_REPO_URL}/releases"
-            echo "releases_url=$RELEASES_URL" >> $GITHUB_OUTPUT
-            echo "Found releases URL: $RELEASES_URL"
+            echo "github_repo=$GITHUB_REPO_URL" >> $GITHUB_OUTPUT
+            echo "Found GitHub repo: $GITHUB_REPO_URL"
           else
             echo "Source is not hosted on GitHub"
-            echo "releases_url=" >> $GITHUB_OUTPUT
+            echo "github_repo=" >> $GITHUB_OUTPUT
           fi
         else
           echo "No source code URI found"
-          echo "releases_url=" >> $GITHUB_OUTPUT
+          echo "github_repo=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Get release links
+      id: releases
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: |
+        OLD_VERSION="${{ steps.old_version.outputs.version }}"
+        NEW_VERSION="${{ steps.changelog.outputs.new_version }}"
+        GITHUB_REPO="${{ steps.changelog.outputs.github_repo }}"
+
+        if [ -z "$GITHUB_REPO" ] || [ -z "$OLD_VERSION" ] || [ -z "$NEW_VERSION" ]; then
+          echo "Missing required information for release links"
+          echo "releases=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
+          echo "Version unchanged, no releases to list"
+          echo "releases=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Extract owner/repo from GitHub URL
+        OWNER_REPO=$(echo "$GITHUB_REPO" | sed -E 's#^https://github\.com/##')
+        echo "Fetching releases for $OWNER_REPO between $OLD_VERSION and $NEW_VERSION"
+
+        # Fetch releases from GitHub API
+        RELEASES_JSON=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+          "https://api.github.com/repos/${OWNER_REPO}/releases?per_page=100" 2>/dev/null) || {
+          echo "Failed to fetch releases from GitHub API"
+          echo "releases=" >> $GITHUB_OUTPUT
+          exit 0
+        }
+
+        # Parse releases and filter those between old and new version
+        if command -v jq &> /dev/null; then
+          RELEASE_LINKS=""
+          while IFS= read -r line; do
+            TAG=$(echo "$line" | cut -d'|' -f1)
+            URL=$(echo "$line" | cut -d'|' -f2)
+            
+            # Extract version from tag (strip leading 'v' for comparison)
+            TAG_VERSION=$(echo "$TAG" | sed 's/^v//')
+            OLD_V=$(echo "$OLD_VERSION" | sed 's/^v//')
+            NEW_V=$(echo "$NEW_VERSION" | sed 's/^v//')
+            
+            # Check if version is > old and <= new
+            if [ "$(printf '%s\n%s' "$OLD_V" "$TAG_VERSION" | sort -V | head -n1)" = "$OLD_V" ] && \
+               [ "$OLD_V" != "$TAG_VERSION" ] && \
+               [ "$(printf '%s\n%s' "$TAG_VERSION" "$NEW_V" | sort -V | head -n1)" = "$TAG_VERSION" ]; then
+              if [ -n "$RELEASE_LINKS" ]; then
+                RELEASE_LINKS="${RELEASE_LINKS}
+        - [$TAG]($URL)"
+              else
+                RELEASE_LINKS="- [$TAG]($URL)"
+              fi
+            fi
+          done < <(echo "$RELEASES_JSON" | jq -r '.[] | "\(.tag_name)|\(.html_url)"')
+          
+          if [ -n "$RELEASE_LINKS" ]; then
+            echo "releases<<EOF" >> $GITHUB_OUTPUT
+            echo "$RELEASE_LINKS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "Found releases:"
+            echo "$RELEASE_LINKS"
+          else
+            echo "No matching releases found"
+            echo "releases=" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "jq not available, skipping release links"
+          echo "releases=" >> $GITHUB_OUTPUT
         fi
 
     - name: Build PR body
@@ -112,10 +201,11 @@ runs:
 
         **Changelog:** ${{ steps.changelog.outputs.url }}"
         fi
-        if [ -n "${{ steps.changelog.outputs.releases_url }}" ]; then
+        if [ -n "${{ steps.releases.outputs.releases }}" ]; then
           BODY="${BODY}
 
-        **Releases:** ${{ steps.changelog.outputs.releases_url }}"
+        **Releases:**
+        ${{ steps.releases.outputs.releases }}"
         fi
         echo "content<<EOF" >> $GITHUB_OUTPUT
         echo "$BODY" >> $GITHUB_OUTPUT
