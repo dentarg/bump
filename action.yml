@@ -51,6 +51,7 @@ runs:
         if [ -z "$VERSION" ]; then
           echo "Could not find version for ${{ inputs.gem_name }}"
           echo "url=" >> $GITHUB_OUTPUT
+          echo "releases_url=" >> $GITHUB_OUTPUT
           exit 0
         fi
         echo "Found version: $VERSION"
@@ -60,15 +61,18 @@ runs:
         RESPONSE=$(curl -sf "$API_URL" 2>/dev/null) || {
           echo "Failed to fetch gem info from RubyGems API"
           echo "url=" >> $GITHUB_OUTPUT
+          echo "releases_url=" >> $GITHUB_OUTPUT
           exit 0
         }
 
         # Check if jq is available
         if command -v jq &> /dev/null; then
           CHANGELOG_URL=$(echo "$RESPONSE" | jq -r '.changelog_uri // empty')
+          SOURCE_CODE_URI=$(echo "$RESPONSE" | jq -r '.source_code_uri // empty')
         else
-          # Fallback: extract changelog_uri using grep/sed if jq is not available
+          # Fallback: extract using grep/sed if jq is not available
           CHANGELOG_URL=$(echo "$RESPONSE" | grep -o '"changelog_uri":"[^"]*"' | sed 's/"changelog_uri":"\(.*\)"/\1/' | head -1)
+          SOURCE_CODE_URI=$(echo "$RESPONSE" | grep -o '"source_code_uri":"[^"]*"' | sed 's/"source_code_uri":"\(.*\)"/\1/' | head -1)
         fi
 
         if [ -n "$CHANGELOG_URL" ]; then
@@ -77,6 +81,25 @@ runs:
         else
           echo "No changelog URL found"
           echo "url=" >> $GITHUB_OUTPUT
+        fi
+
+        # Build GitHub releases URL if source is hosted on GitHub
+        if [ -n "$SOURCE_CODE_URI" ]; then
+          echo "Found source code URI: $SOURCE_CODE_URI"
+          # Check if it's a GitHub URL and extract owner/repo
+          if echo "$SOURCE_CODE_URI" | grep -qE '^https://github\.com/[^/]+/[^/]+'; then
+            # Extract the base GitHub repo URL (remove any trailing paths like /tree/main)
+            GITHUB_REPO_URL=$(echo "$SOURCE_CODE_URI" | sed -E 's#^(https://github\.com/[^/]+/[^/]+).*#\1#')
+            RELEASES_URL="${GITHUB_REPO_URL}/releases"
+            echo "releases_url=$RELEASES_URL" >> $GITHUB_OUTPUT
+            echo "Found releases URL: $RELEASES_URL"
+          else
+            echo "Source is not hosted on GitHub"
+            echo "releases_url=" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "No source code URI found"
+          echo "releases_url=" >> $GITHUB_OUTPUT
         fi
 
     - name: Build PR body
@@ -88,6 +111,11 @@ runs:
           BODY="${BODY}
 
         **Changelog:** ${{ steps.changelog.outputs.url }}"
+        fi
+        if [ -n "${{ steps.changelog.outputs.releases_url }}" ]; then
+          BODY="${BODY}
+
+        **Releases:** ${{ steps.changelog.outputs.releases_url }}"
         fi
         echo "content<<EOF" >> $GITHUB_OUTPUT
         echo "$BODY" >> $GITHUB_OUTPUT
