@@ -38,8 +38,9 @@ runs:
     - name: Update gem with bundler
       shell: bash
       run: |
-        bundle config set frozen false
         bundle update --conservative ${{ inputs.gem_name }}
+      env:
+        BUNDLE_FROZEN=false
 
     - name: Get changelog URL
       id: changelog
@@ -95,8 +96,7 @@ runs:
     - name: Exclude irrelevant files from the pull request
       shell: bash
       run: |
-        echo "/.bundle/config" >> .gitignore
-        echo "/vendor/bundle" >> .gitignore
+        rm -rf vendor/bundle
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v7
