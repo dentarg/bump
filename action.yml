@@ -53,7 +53,8 @@ runs:
       shell: bash
       run: |
         # Extract the old version from Gemfile.lock before updating
-        OLD_VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | head -1 | sed 's/.*(\(.*\))/\1/')
+        # Exclude lines with ~> to avoid matching version constraints in DEPENDENCIES section
+        OLD_VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | grep -v "~>" | head -1 | sed 's/.*(\(.*\))/\1/')
         if [ -n "$OLD_VERSION" ]; then
           echo "version=$OLD_VERSION" >> $GITHUB_OUTPUT
           echo "Found old version: $OLD_VERSION"
@@ -74,7 +75,8 @@ runs:
       shell: bash
       run: |
         # Extract the new version from Gemfile.lock (handles various indentation)
-        VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | head -1 | sed 's/.*(\(.*\))/\1/')
+        # Exclude lines with ~> to avoid matching version constraints in DEPENDENCIES section
+        VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | grep -v "~>" | head -1 | sed 's/.*(\(.*\))/\1/')
         if [ -z "$VERSION" ]; then
           echo "Could not find version for ${{ inputs.gem_name }}"
           echo "url=" >> $GITHUB_OUTPUT
