@@ -5,7 +5,7 @@ set -u
 
 REPO=dentarg/bump
 WORKFLOW=test.yml
-GEM=rack
+GEM=bigdecimal
 PR=${1:-}
 
 if [ -n "$PR" ]; then
