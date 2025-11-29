@@ -27,6 +27,7 @@ jobs:
         with:
           gem_name: ${{ inputs.gem_name }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: dependencies
 ```
 
 ## Inputs
