@@ -5,11 +5,18 @@ set -u
 
 REPO=dentarg/bump
 WORKFLOW=test.yml
-GEM=${1:-"rack"}
+GEM=rack
+PR=${1:-}
+
+if [ -n "$PR" ]; then
+  headRefName=$(gh pr list --json number,headRefName --jq ".[] | select(.number == ${PR}) | .headRefName")
+
+  USE_REF="--ref $headRefName" || true
+fi
 
 set -x
 
-gh workflow run --repo $REPO $WORKFLOW --field gem_name=$GEM
+gh workflow run --repo $REPO $WORKFLOW --field gem_name=$GEM ${USE_REF:-}
 sleep 2
 runId=$(gh run list --repo $REPO --workflow $WORKFLOW --limit 1 --json databaseId --jq '.[].databaseId')
 gh run watch --repo $REPO --interval 1 --exit-status $runId

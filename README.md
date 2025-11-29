@@ -47,6 +47,9 @@ How to test the action:
 ```shell
 bin/test
 
+# test changes
+bin/test <pull-request number>
+
 # cleanup
-gh pr close -d N
+bin/del <pull-request number>
 ```
