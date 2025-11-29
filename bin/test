@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+set -u
+
+REPO=dentarg/bump
+WORKFLOW=test.yml
+GEM=${1:-"rack"}
+
+set -x
+
+gh workflow run --repo $REPO $WORKFLOW --field gem_name=$GEM
+sleep 2
+runId=$(gh run list --repo $REPO --workflow $WORKFLOW --limit 1 --json databaseId --jq '.[].databaseId')
+gh run watch --repo $REPO --interval 1 --exit-status $runId
+gh run view $runId
+gh run view --web $runId
