@@ -38,3 +38,14 @@ See [`action.yml`](blob/main/action.yml).
 1. The action runs `bundle update --conservative <gem_name>` to update only the specified gem and its dependencies
 2. If there are changes to `Gemfile.lock`, it creates a pull request with the updates
 3. The PR includes a descriptive title and body explaining the changes
+
+## Development
+
+How to test the action:
+
+```shell
+bin/test
+
+# cleanup
+gh pr close -d N
+```
