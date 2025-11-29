@@ -12,11 +12,12 @@ if [ -n "$PR" ]; then
   headRefName=$(gh pr list --json number,headRefName --jq ".[] | select(.number == ${PR}) | .headRefName")
 
   USE_REF="--ref $headRefName" || true
+  LABEL="test:pr-${PR}"
 fi
 
 set -x
 
-gh workflow run --repo $REPO $WORKFLOW --field gem_name=$GEM ${USE_REF:-}
+gh workflow run --repo $REPO $WORKFLOW ${USE_REF:-} --field gem_name=$GEM --field label=${LABEL:-"test:main"}
 sleep 2
 runId=$(gh run list --repo $REPO --workflow $WORKFLOW --limit 1 --json databaseId --jq '.[].databaseId')
 gh run watch --repo $REPO --interval 1 --exit-status $runId

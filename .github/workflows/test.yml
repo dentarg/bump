@@ -7,6 +7,11 @@ on:
         description: 'Name of the Ruby gem to update'
         required: true
         type: string
+      label:
+        description: 'Label to set on the pull request created by the action'
+        required: false
+        type: string
+        default: test
 
 permissions:
   contents: write
@@ -26,4 +31,4 @@ jobs:
         with:
           gem_name: ${{ inputs.gem_name }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: dependencies
+          labels: ${{ inputs.label }}
