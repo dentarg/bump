@@ -29,6 +29,12 @@ runs:
           echo "name=bump-${{ inputs.gem_name }}-$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
         fi
 
+    - uses: actions/checkout@v6
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ruby
+        bundler-cache: true
+
     - name: Update gem with bundler
       shell: bash
       run: bundle update --conservative ${{ inputs.gem_name }}
