@@ -96,6 +96,7 @@ runs:
     - name: Exclude irrelevant files from the pull request
       shell: bash
       run: |
+        git checkout .bundle/config || rm .bundle/config
         rm -rf vendor/bundle
 
     - name: Create Pull Request
