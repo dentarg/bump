@@ -93,6 +93,7 @@ runs:
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Exclude irrelevant files from the pull request
+      shell: bash
       run: |
         echo "/.bundle/config" >> .gitignore
         echo "/vendor/bundle" >> .gitignore
