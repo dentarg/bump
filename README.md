@@ -52,4 +52,7 @@ bin/test <pull-request number>
 
 # cleanup
 bin/del <pull-request number>
+
+# squash merge pull-request
+bin/merge-pr <pull-request number>
 ```
