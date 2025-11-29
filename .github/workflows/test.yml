@@ -1,0 +1,28 @@
+name: Test Action
+
+on:
+  workflow_dispatch:
+    inputs:
+      gem_name:
+        description: 'Name of the Ruby gem to update'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ruby
+          bundler-cache: true
+      - name: Test the action
+        uses: ./
+        with:
+          gem_name: ${{ inputs.gem_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
