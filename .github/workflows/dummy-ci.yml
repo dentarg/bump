@@ -1,24 +1,12 @@
 name: Dummy CI
 
 on:
-  push:
   pull_request:
-    types:
-      # defaults https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
-      - opened
-      - synchronize
-      - reopened
-      # for bumps https://github.com/peter-evans/create-pull-request/blob/84ae59a2cdc2258d6fa0732dd66352dddae2a412/docs/concepts-guidelines.md#triggering-further-workflow-runs
-      - ready_for_review
-  workflow_dispatch:
+    types: [ready_for_review]
 
 jobs:
   specs:
     runs-on: ubuntu-latest
     steps:
     - name: Dummy Step
-      env:
-        GITHUB_CONTEXT: ${{ toJson(github) }}
-      run: |
-        uname -a
-        echo $GITHUB_CONTEXT
+      run: uname -a
