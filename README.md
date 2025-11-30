@@ -48,7 +48,7 @@ jobs:
 
 ## Inputs
 
-See [`action.yml`](blob/main/action.yml).
+See [`action.yml`](action.yml).
 
 ## How it works
 
