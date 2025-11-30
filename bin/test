@@ -22,4 +22,6 @@ sleep 2
 runId=$(gh run list --repo $REPO --workflow $WORKFLOW --limit 1 --json databaseId --jq '.[].databaseId')
 gh run watch --repo $REPO --interval 1 --exit-status $runId
 gh run view $runId
-gh run view --web $runId
+prNumber=$(gh run view --log $runId | grep -F 'Pull request created' | head -1 | sed 's|.*/pull/\([0-9][0-9]*\).*|\1|')
+gh pr --repo $REPO ready $prNumber
+gh pr edit --repo $REPO $prNumber --add-label gem-compare
