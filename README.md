@@ -30,7 +30,7 @@ jobs:
           labels: dependencies
 ```
 
-To enable [triggering further workflow runs], the pull requests created are marked as draft, so you can use the [`ready_for_review` trigger] in your workflows to have them run when you mark the pull request as ready.
+To be able to [trigger further workflow runs], the pull requests created are marked as draft, so you can use the [`ready_for_review` trigger] in your workflows to have them run when you mark the pull request as ready.
 
 ```yaml
 name: CI
@@ -72,5 +72,5 @@ bin/del <pull-request number>
 bin/merge-pr <pull-request number>
 ```
 
-[triggering further workflow runs]: https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#triggering-further-workflow-runs
+[trigger further workflow runs]: https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#triggering-further-workflow-runs
 [`ready_for_review` trigger]: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
