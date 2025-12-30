@@ -52,13 +52,27 @@ runs:
       shell: bash
       run: |
         # Extract the old version from Gemfile.lock before updating
-        # Exclude lines with ~> to avoid matching version constraints in DEPENDENCIES section
-        OLD_VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | grep -v "~>" | head -1 | sed 's/.*(\(.*\))/\1/')
+        # Parse only the specs section (indented with 4 spaces under "  specs:")
+        # to avoid matching DEPENDENCIES section entries with version constraints
+        GEM_NAME="${{ inputs.gem_name }}"
+        OLD_VERSION=$(awk -v gem="$GEM_NAME" '
+          /^  specs:$/ { in_specs = 1; next }
+          /^[A-Z]/ { in_specs = 0 }
+          in_specs && /^    [^ ]/ && $1 == gem {
+            # Match only top-level gems (4-space indent), not dependencies (6-space indent)
+            # Extract version from parentheses, e.g., "(1.2.3)" or "(1.2.3-x86_64-darwin)"
+            ver = $2
+            gsub(/[()]/, "", ver)
+            print ver
+            exit
+          }
+        ' Gemfile.lock | sed -E 's/-[a-z0-9_]+-[a-z0-9_]+(-[a-z0-9_]+)?$//')
+
         if [ -n "$OLD_VERSION" ]; then
           echo "version=$OLD_VERSION" >> $GITHUB_OUTPUT
           echo "Found old version: $OLD_VERSION"
         else
-          echo "Could not find old version for ${{ inputs.gem_name }}"
+          echo "Could not find old version for $GEM_NAME"
           echo "version=" >> $GITHUB_OUTPUT
         fi
 
@@ -73,11 +87,25 @@ runs:
       id: changelog
       shell: bash
       run: |
-        # Extract the new version from Gemfile.lock (handles various indentation)
-        # Exclude lines with ~> to avoid matching version constraints in DEPENDENCIES section
-        VERSION=$(grep -E "^\s+${{ inputs.gem_name }} \(" Gemfile.lock | grep -v "~>" | head -1 | sed 's/.*(\(.*\))/\1/')
+        # Extract the new version from Gemfile.lock after updating
+        # Parse only the specs section (indented with 4 spaces under "  specs:")
+        # to avoid matching DEPENDENCIES section entries with version constraints
+        GEM_NAME="${{ inputs.gem_name }}"
+        VERSION=$(awk -v gem="$GEM_NAME" '
+          /^  specs:$/ { in_specs = 1; next }
+          /^[A-Z]/ { in_specs = 0 }
+          in_specs && /^    [^ ]/ && $1 == gem {
+            # Match only top-level gems (4-space indent), not dependencies (6-space indent)
+            # Extract version from parentheses, e.g., "(1.2.3)" or "(1.2.3-x86_64-darwin)"
+            ver = $2
+            gsub(/[()]/, "", ver)
+            print ver
+            exit
+          }
+        ' Gemfile.lock | sed -E 's/-[a-z0-9_]+-[a-z0-9_]+(-[a-z0-9_]+)?$//')
+
         if [ -z "$VERSION" ]; then
-          echo "Could not find version for ${{ inputs.gem_name }}"
+          echo "Could not find version for $GEM_NAME"
           echo "url=" >> $GITHUB_OUTPUT
           echo "new_version=" >> $GITHUB_OUTPUT
           echo "github_repo=" >> $GITHUB_OUTPUT
