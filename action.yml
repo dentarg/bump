@@ -234,7 +234,7 @@ runs:
       id: body
       shell: bash
       run: |
-        BODY="This PR updates the \`${{ inputs.gem_name }}\` gem using \`bundle update --conservative\`."
+        BODY="Update the \`${{ inputs.gem_name }}\` gem using \`bundle update --conservative\`."
         if [ -n "${{ steps.changelog.outputs.url }}" ]; then
           BODY="${BODY}
 
