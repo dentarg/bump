@@ -52,9 +52,10 @@ See [`action.yml`](action.yml).
 
 ## How it works
 
+1. The Ruby version needs to be specified in `Gemfile.lock`
 1. The action runs `bundle update --conservative <gem_name>` to update only the specified gem and its dependencies
-2. If there are changes to `Gemfile.lock`, it creates a pull request with the updates
-3. The PR includes a descriptive title and body explaining the changes
+1. If there are changes to `Gemfile.lock`, it creates a pull request with the updates
+1. The PR includes a descriptive title and body explaining the changes
 
 ## Development
 
