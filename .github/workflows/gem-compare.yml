@@ -16,6 +16,6 @@ jobs:
       startsWith(github.head_ref, 'bump-') || contains(github.event.label.name, 'gem-compare')
     runs-on: ubuntu-latest
     steps:
-      - uses: dentarg/gem-compare@v1
+      - uses: dentarg/gem-compare@714ba8b
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
