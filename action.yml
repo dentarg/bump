@@ -135,6 +135,19 @@ runs:
           echo "url=" >> $GITHUB_OUTPUT
         fi
 
+        # Output RubyGems.org URI
+        RUBYGEMS_URI="https://rubygems.org/gems/${{ inputs.gem_name }}/versions/${VERSION}"
+        echo "rubygems_uri=$RUBYGEMS_URI" >> $GITHUB_OUTPUT
+        echo "RubyGems.org URI: $RUBYGEMS_URI"
+
+        # Output Homepage URI
+        if [ -n "$HOMEPAGE_URI" ]; then
+          echo "homepage_uri=$HOMEPAGE_URI" >> $GITHUB_OUTPUT
+          echo "Homepage URI: $HOMEPAGE_URI"
+        else
+          echo "homepage_uri=" >> $GITHUB_OUTPUT
+        fi
+
         # Extract GitHub repo - try source_code_uri first, fall back to homepage_uri
         REPO_URI=""
         if [ -n "$SOURCE_CODE_URI" ]; then
@@ -147,9 +160,10 @@ runs:
 
         if [ -n "$REPO_URI" ]; then
           # Check if it's a GitHub URL and extract owner/repo
-          if echo "$REPO_URI" | grep -qE '^https://github\.com/[^/]+/[^/]+'; then
+          if echo "$REPO_URI" | grep -qE '^https?://github\.com/[^/]+/[^/]+'; then
             # Extract the base GitHub repo URL (remove any trailing paths like /tree/main)
-            GITHUB_REPO_URL=$(echo "$REPO_URI" | sed -E 's#^(https://github\.com/[^/]+/[^/]+).*#\1#')
+            # Also normalize http:// to https://
+            GITHUB_REPO_URL=$(echo "$REPO_URI" | sed -E 's#^https?://github\.com/#https://github.com/#' | sed -E 's#^(https://github\.com/[^/]+/[^/]+).*#\1#')
             echo "github_repo=$GITHUB_REPO_URL" >> $GITHUB_OUTPUT
             echo "Found GitHub repo: $GITHUB_REPO_URL"
           else
@@ -235,6 +249,16 @@ runs:
       shell: bash
       run: |
         BODY="Update the \`${{ inputs.gem_name }}\` gem using \`bundle update --conservative\`."
+        if [ -n "${{ steps.changelog.outputs.rubygems_uri }}" ]; then
+          BODY="${BODY}
+
+        **RubyGems.org:** ${{ steps.changelog.outputs.rubygems_uri }}"
+        fi
+        if [ -n "${{ steps.changelog.outputs.homepage_uri }}" ]; then
+          BODY="${BODY}
+
+        **Homepage:** ${{ steps.changelog.outputs.homepage_uri }}"
+        fi
         if [ -n "${{ steps.changelog.outputs.url }}" ]; then
           BODY="${BODY}
 
