@@ -2,6 +2,8 @@ GEM
   remote: https://rubygems.org/
   specs:
     bigdecimal (3.2.0)
+    pg (1.6.2)
+    pg (1.6.2-x86_64-linux)
 
 PLATFORMS
   ruby
@@ -9,6 +11,7 @@ PLATFORMS
 
 DEPENDENCIES
   bigdecimal
+  pg
 
 RUBY VERSION
    ruby 3.4.8p72
