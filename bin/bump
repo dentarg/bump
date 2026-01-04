@@ -6,13 +6,15 @@
 WORKFLOW=${WORKFLOW:-gem-bump.yml}
 
 usage() {
-  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre]"
-  echo "       $0 <gem name> pre"
+  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre] [--merge]"
+  echo "       $0 <gem name> pre [--merge]"
+  echo "       $0 --merge <pr number>"
   echo ""
   echo "Arguments:"
   echo "  gem name  Name of the gem to update (required)"
   echo "  TYPE      Update type: major, minor, patch, or a specific version"
   echo "  pre       Include pre-release versions"
+  echo "  --merge   Automatically merge the PR after creation, or merge existing PR"
   echo ""
   echo "Environment variables:"
   echo "  WORKFLOW  Workflow file to run (default: gem-bump.yml)"
@@ -22,6 +24,8 @@ usage() {
   echo "  $0 rails patch        # update to latest patch"
   echo "  $0 rails 7.1.2        # update to specific version"
   echo "  $0 rails minor pre    # update to latest minor + pre-release"
+  echo "  $0 rails --merge      # update and auto-merge"
+  echo "  $0 --merge 123        # merge existing PR #123"
   exit 0
 }
 
@@ -29,9 +33,37 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   usage
 fi
 
+merge_pr() {
+  prNumber=$1
+  PR_BODY=$(gh pr view --json body $prNumber | jq -r '.body')
+  GIT_NAME=$(git config --get user.name)
+  GIT_EMAIL=$(git config --get user.email)
+  COMMIT_MSG="${PR_BODY}\n\nCo-authored-by: ${GIT_NAME} <${GIT_EMAIL}>"
+  echo "$COMMIT_MSG" | gh pr merge --squash --auto --body-file - $prNumber
+}
+
+# Check for --merge flag in any position
+MERGE=""
+ARGS=""
+for arg in "$@"; do
+  if [ "$arg" = "--merge" ]; then
+    MERGE="true"
+  else
+    ARGS="$ARGS $arg"
+  fi
+done
+set -- $ARGS
+
 GEM=${1:-}
 ARG2=${2:-}
 ARG3=${3:-}
+
+# If --merge with just a PR number, merge and exit
+if [ -n "$MERGE" ] && echo "$GEM" | grep -qE '^[0-9]+$' && [ -z "$ARG2" ]; then
+  set -x
+  merge_pr "$GEM"
+  exit 0
+fi
 
 if [ -z "$GEM" ]; then
   usage
@@ -79,3 +111,7 @@ gh run watch --interval 1 --exit-status $runId
 gh run view --verbose $runId
 prNumber=$(gh run view --log $runId | grep -F 'Pull request created' | head -1 | sed 's|.*/pull/\([0-9][0-9]*\).*|\1|')
 gh pr ready $prNumber
+
+if [ -n "$MERGE" ] && [ -n "$prNumber" ]; then
+  merge_pr "$prNumber"
+fi
