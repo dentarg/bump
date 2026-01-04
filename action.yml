@@ -338,7 +338,6 @@ runs:
       shell: bash
       run: |
         git checkout .bundle/config || rm .bundle/config
-        git checkout Gemfile || true
         rm -rf vendor/bundle
 
     - name: Create Pull Request
