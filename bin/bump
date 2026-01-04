@@ -4,14 +4,37 @@
 # set -u
 
 WORKFLOW=${WORKFLOW:-gem-bump.yml}
+
+usage() {
+  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre]"
+  echo "       $0 <gem name> pre"
+  echo ""
+  echo "Arguments:"
+  echo "  gem name  Name of the gem to update (required)"
+  echo "  TYPE      Update type: major, minor, patch, or a specific version"
+  echo "  pre       Include pre-release versions"
+  echo ""
+  echo "Environment variables:"
+  echo "  WORKFLOW  Workflow file to run (default: gem-bump.yml)"
+  echo ""
+  echo "Examples:"
+  echo "  $0 rails              # update to latest compatible"
+  echo "  $0 rails patch        # update to latest patch"
+  echo "  $0 rails 7.1.2        # update to specific version"
+  echo "  $0 rails minor pre    # update to latest minor + pre-release"
+  exit 0
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+fi
+
 GEM=${1:-}
 ARG2=${2:-}
 ARG3=${3:-}
 
 if [ -z "$GEM" ]; then
-  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre]"
-  echo "       $0 <gem name> pre"
-  exit 0
+  usage
 fi
 
 UPDATE_TYPE=""
