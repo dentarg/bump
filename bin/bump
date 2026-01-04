@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# set -e
+# set -u
+
+WORKFLOW=${WORKFLOW:-gem-bump.yml}
+GEM=${1:-}
+ARG2=${2:-}
+ARG3=${3:-}
+
+if [ -z "$GEM" ]; then
+  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre]"
+  echo "       $0 <gem name> pre"
+  exit 0
+fi
+
+UPDATE_TYPE=""
+GEM_VERSION=""
+PRE=""
+
+# Check if arg looks like a version (digits with optional dots)
+is_version() {
+  echo "$1" | grep -qE '^[0-9]+(\.[0-9]+)*$'
+}
+
+if [ "$ARG2" = "pre" ]; then
+  PRE="true"
+elif [ -n "$ARG2" ]; then
+  if is_version "$ARG2"; then
+    GEM_VERSION="$ARG2"
+  else
+    UPDATE_TYPE="$ARG2"
+  fi
+  if [ "$ARG3" = "pre" ]; then
+    PRE="true"
+  fi
+fi
+
+EXTRA_FIELDS=""
+if [ -n "$UPDATE_TYPE" ]; then
+  EXTRA_FIELDS="$EXTRA_FIELDS --field update_type=$UPDATE_TYPE"
+fi
+if [ -n "$GEM_VERSION" ]; then
+  EXTRA_FIELDS="$EXTRA_FIELDS --field gem_version=$GEM_VERSION"
+fi
+if [ -n "$PRE" ]; then
+  EXTRA_FIELDS="$EXTRA_FIELDS --field pre=$PRE"
+fi
+
+set -x
+
+gh workflow run $WORKFLOW ${USE_REF:-} --field gem_name=$GEM $EXTRA_FIELDS
+sleep 2
+runId=$(gh run list --workflow $WORKFLOW --limit 1 --json databaseId --jq '.[].databaseId')
+gh run watch --interval 1 --exit-status $runId
+gh run view --verbose $runId
+prNumber=$(gh run view --log $runId | grep -F 'Pull request created' | head -1 | sed 's|.*/pull/\([0-9][0-9]*\).*|\1|')
+gh pr ready $prNumber

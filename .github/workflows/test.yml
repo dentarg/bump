@@ -12,6 +12,24 @@ on:
         required: false
         type: string
         default: test
+      update_type:
+        description: 'Update type (major, minor, patch)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - major
+          - minor
+          - patch
+      pre:
+        description: 'Include pre-release versions'
+        required: false
+        type: boolean
+        default: false
+      gem_version:
+        description: 'Specific version to update to'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -26,5 +44,8 @@ jobs:
         uses: ./
         with:
           gem_name: ${{ inputs.gem_name }}
+          update_type: ${{ inputs.update_type }}
+          pre: ${{ inputs.pre }}
+          gem_version: ${{ inputs.gem_version }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           labels: ${{ inputs.label }}

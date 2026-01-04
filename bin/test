@@ -5,8 +5,74 @@ set -u
 
 REPO=dentarg/bump
 WORKFLOW=test.yml
-GEM=bigdecimal
-PR=${1:-}
+GEM=${GEM:-bigdecimal}
+
+usage() {
+  echo "Usage: $0 [PR] [major|minor|patch|<version>] [pre]"
+  echo ""
+  echo "Arguments:"
+  echo "  PR        Pull request number to test (optional)"
+  echo "  TYPE      Update type: major, minor, patch, or a specific version"
+  echo "  pre       Include pre-release versions"
+  echo ""
+  echo "Environment variables:"
+  echo "  GEM       Gem to test (default: bigdecimal)"
+  echo ""
+  echo "Examples:"
+  echo "  $0                    # test main branch"
+  echo "  $0 123                # test PR #123"
+  echo "  $0 123 patch          # test PR with patch update"
+  echo "  $0 123 1.2.3          # test PR with specific version"
+  echo "  $0 minor pre          # test main with minor + pre-release"
+  echo "  GEM=rails $0 patch    # test main with different gem"
+  exit 0
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+fi
+
+ARG1=${1:-}
+ARG2=${2:-}
+ARG3=${3:-}
+
+PR=""
+UPDATE_TYPE=""
+GEM_VERSION=""
+PRE=""
+
+# Check if arg looks like a version (digits with optional dots)
+is_version() {
+  echo "$1" | grep -qE '^[0-9]+(\.[0-9]+)*$'
+}
+
+# Check if first arg is a PR number (numeric)
+if echo "$ARG1" | grep -qE '^[0-9]+$'; then
+  PR="$ARG1"
+  if [ "$ARG2" = "pre" ]; then
+    PRE="true"
+  elif [ -n "$ARG2" ]; then
+    if is_version "$ARG2"; then
+      GEM_VERSION="$ARG2"
+    else
+      UPDATE_TYPE="$ARG2"
+    fi
+    if [ "$ARG3" = "pre" ]; then
+      PRE="true"
+    fi
+  fi
+elif [ "$ARG1" = "pre" ]; then
+  PRE="true"
+elif [ -n "$ARG1" ]; then
+  if is_version "$ARG1"; then
+    GEM_VERSION="$ARG1"
+  else
+    UPDATE_TYPE="$ARG1"
+  fi
+  if [ "$ARG2" = "pre" ]; then
+    PRE="true"
+  fi
+fi
 
 if [ -n "$PR" ]; then
   headRefName=$(gh pr list --json number,headRefName --jq ".[] | select(.number == ${PR}) | .headRefName")
@@ -15,9 +81,20 @@ if [ -n "$PR" ]; then
   LABEL="test:pr-${PR}"
 fi
 
+EXTRA_FIELDS=""
+if [ -n "$UPDATE_TYPE" ]; then
+  EXTRA_FIELDS="$EXTRA_FIELDS --field update_type=$UPDATE_TYPE"
+fi
+if [ -n "$GEM_VERSION" ]; then
+  EXTRA_FIELDS="$EXTRA_FIELDS --field gem_version=$GEM_VERSION"
+fi
+if [ -n "$PRE" ]; then
+  EXTRA_FIELDS="$EXTRA_FIELDS --field pre=$PRE"
+fi
+
 set -x
 
-gh workflow run --repo $REPO $WORKFLOW ${USE_REF:-} --field gem_name=$GEM --field label=${LABEL:-"test:main"}
+gh workflow run --repo $REPO $WORKFLOW ${USE_REF:-} --field gem_name=$GEM --field label=${LABEL:-"test:main"} $EXTRA_FIELDS
 sleep 2
 runId=$(gh run list --repo $REPO --workflow $WORKFLOW --limit 1 --json databaseId --jq '.[].databaseId')
 gh run watch --repo $REPO --interval 1 --exit-status $runId

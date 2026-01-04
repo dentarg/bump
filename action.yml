@@ -19,6 +19,18 @@ inputs:
     description: 'Comma-separated list of labels to apply to the pull request'
     required: false
     default: ''
+  update_type:
+    description: 'Update type: major, minor, or patch (optional, defaults to latest compatible version)'
+    required: false
+    default: ''
+  pre:
+    description: 'Include pre-release versions (true/false)'
+    required: false
+    default: 'false'
+  gem_version:
+    description: 'Specific version of the gem to update to (optional)'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -76,12 +88,40 @@ runs:
           echo "version=" >> $GITHUB_OUTPUT
         fi
 
+    - name: Pin gem version in Gemfile
+      if: inputs.gem_version != ''
+      shell: bash
+      run: |
+        GEM_NAME="${{ inputs.gem_name }}"
+        GEM_VERSION="${{ inputs.gem_version }}"
+        echo "Pinning $GEM_NAME to version $GEM_VERSION"
+
+        # Check if gem exists in Gemfile and update/add version constraint
+        if grep -qE "^gem ['\"]${GEM_NAME}['\"]" Gemfile; then
+          # Gem exists, update or add version constraint
+          sed -i -E "s/^(gem ['\"]${GEM_NAME}['\"]).*$/\1, \"${GEM_VERSION}\"/" Gemfile
+        else
+          # Gem not in Gemfile (might be a transitive dependency), add it
+          echo "gem \"${GEM_NAME}\", \"${GEM_VERSION}\"" >> Gemfile
+        fi
+
+        echo "Updated Gemfile:"
+        grep -E "^gem ['\"]${GEM_NAME}['\"]" Gemfile || true
+
     - name: Update gem with bundler
       shell: bash
       env:
         BUNDLE_FROZEN: false
       run: |
-        bundle update --conservative ${{ inputs.gem_name }}
+        BUNDLE_FLAGS="--conservative"
+        if [ -n "${{ inputs.update_type }}" ]; then
+          BUNDLE_FLAGS="$BUNDLE_FLAGS --${{ inputs.update_type }}"
+        fi
+        if [ "${{ inputs.pre }}" = "true" ]; then
+          BUNDLE_FLAGS="$BUNDLE_FLAGS --pre"
+        fi
+        echo "Running: bundle update $BUNDLE_FLAGS ${{ inputs.gem_name }}"
+        bundle update $BUNDLE_FLAGS ${{ inputs.gem_name }}
 
     - name: Get changelog URL
       id: changelog
@@ -248,7 +288,14 @@ runs:
       id: body
       shell: bash
       run: |
-        BODY="Update the \`${{ inputs.gem_name }}\` gem using \`bundle update --conservative\`."
+        BUNDLE_FLAGS="--conservative"
+        if [ -n "${{ inputs.update_type }}" ]; then
+          BUNDLE_FLAGS="$BUNDLE_FLAGS --${{ inputs.update_type }}"
+        fi
+        if [ "${{ inputs.pre }}" = "true" ]; then
+          BUNDLE_FLAGS="$BUNDLE_FLAGS --pre"
+        fi
+        BODY="Update the \`${{ inputs.gem_name }}\` gem using \`bundle update $BUNDLE_FLAGS\`."
         if [ -n "${{ steps.changelog.outputs.rubygems_uri }}" ]; then
           BODY="${BODY}
 
@@ -291,6 +338,7 @@ runs:
       shell: bash
       run: |
         git checkout .bundle/config || rm .bundle/config
+        git checkout Gemfile || true
         rm -rf vendor/bundle
 
     - name: Create Pull Request
