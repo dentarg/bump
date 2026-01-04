@@ -6,15 +6,16 @@
 WORKFLOW=${WORKFLOW:-gem-bump.yml}
 
 usage() {
-  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre] [--merge]"
-  echo "       $0 <gem name> pre [--merge]"
-  echo "       $0 --merge <pr number>"
+  echo "Usage: $0 <gem name> [major|minor|patch|<version>] [pre] [--merge] [--admin]"
+  echo "       $0 <gem name> pre [--merge] [--admin]"
+  echo "       $0 --merge [--admin] <pr number>"
   echo ""
   echo "Arguments:"
   echo "  gem name  Name of the gem to update (required)"
   echo "  TYPE      Update type: major, minor, patch, or a specific version"
   echo "  pre       Include pre-release versions"
   echo "  --merge   Automatically merge the PR after creation, or merge existing PR"
+  echo "  --admin   Merge immediately using admin privileges (skip auto-merge)"
   echo ""
   echo "Environment variables:"
   echo "  WORKFLOW  Workflow file to run (default: gem-bump.yml)"
@@ -26,6 +27,7 @@ usage() {
   echo "  $0 rails minor pre    # update to latest minor + pre-release"
   echo "  $0 rails --merge      # update and auto-merge"
   echo "  $0 --merge 123        # merge existing PR #123"
+  echo "  $0 --merge --admin 123  # merge PR #123 immediately (admin)"
   exit 0
 }
 
@@ -39,15 +41,24 @@ merge_pr() {
   GIT_NAME=$(git config --get user.name)
   GIT_EMAIL=$(git config --get user.email)
   COMMIT_MSG="${PR_BODY}\n\nCo-authored-by: ${GIT_NAME} <${GIT_EMAIL}>"
-  echo "$COMMIT_MSG" | gh pr merge --squash --auto --body-file - $prNumber
+  MERGE_FLAGS="--squash"
+  if [ -z "$ADMIN" ]; then
+    MERGE_FLAGS="$MERGE_FLAGS --auto"
+  else
+    MERGE_FLAGS="$MERGE_FLAGS --admin"
+  fi
+  echo "$COMMIT_MSG" | gh pr merge $MERGE_FLAGS --body-file - $prNumber
 }
 
-# Check for --merge flag in any position
+# Check for --merge and --admin flags in any position
 MERGE=""
+ADMIN=""
 ARGS=""
 for arg in "$@"; do
   if [ "$arg" = "--merge" ]; then
     MERGE="true"
+  elif [ "$arg" = "--admin" ]; then
+    ADMIN="true"
   else
     ARGS="$ARGS $arg"
   fi
